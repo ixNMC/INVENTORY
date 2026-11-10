@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proyecto INVENTORY - Simulador 3D de Volúmenes</title>
+    <title>Proyecto INVENTORY - Gestión de Unidades de Medida</title>
     <style>
         /* Estilos generales de la ventana */
         * {
@@ -22,7 +22,7 @@
 
         /* Panel lateral izquierdo para introducir parámetros */
         .panel-control {
-            width: 340px;
+            width: 350px;
             background-color: #2c3e50;
             color: #ecf0f1;
             padding: 18px;
@@ -73,6 +73,16 @@
             background-color: #1e272e;
             color: #ffffff;
             font-size: 0.9rem;
+            transition: opacity 0.2s, background-color 0.2s;
+        }
+
+        /* Estilo visual para campos desactivados (disabled) */
+        .grupo-input input:disabled {
+            background-color: #34495e;
+            color: #7f8c8d;
+            border-color: #2c3e50;
+            cursor: not-allowed;
+            opacity: 0.6;
         }
 
         /* Botones de acción */
@@ -156,31 +166,35 @@
     <aside class="panel-control">
         <h1>INVENTORY 3D</h1>
 
-        <div class="seccion-titulo">1. Espacio / Contenedor</div>
+        <!-- SECCIÓN 1: UNIDAD DE MEDIDA -->
+        <div class="seccion-titulo">1. UNIDAD DE MEDIDA</div>
         <div class="grupo-input">
-            <label for="tipoEspacio">Modo de estructura:</label>
-            <select id="tipoEspacio">
-                <option value="contenedor">Contenedor Cerrado (Caja Mayor)</option>
-                <option value="palet">Base / Palet (Límite en altura)</option>
+            <label for="unidadMedida">Unidad de medida:</label>
+            <select id="unidadMedida">
+                <option value="unidad" selected>UNIDAD</option>
+                <option value="caja">CAJA</option>
+                <option value="palet">PALET</option>
             </select>
         </div>
 
+        <!-- Estos campos se desactivan cuando se selecciona UNIDAD -->
         <div class="fila-inputs">
             <div class="grupo-input">
                 <label for="contAncho">Ancho (X)</label>
-                <input type="number" id="contAncho" value="120" min="10">
+                <input type="number" id="contAncho" value="80" min="5">
             </div>
             <div class="grupo-input">
                 <label for="contAlto">Alto (Y)</label>
-                <input type="number" id="contAlto" value="100" min="10">
+                <input type="number" id="contAlto" value="60" min="5">
             </div>
             <div class="grupo-input">
                 <label for="contProf">Fondo (Z)</label>
-                <input type="number" id="contProf" value="80" min="10">
+                <input type="number" id="contProf" value="60" min="5">
             </div>
         </div>
 
-        <div class="seccion-titulo">2. Piezas / Cajas a encajar</div>
+        <!-- SECCIÓN 2: DIMENSIONES -->
+        <div class="seccion-titulo">2. DIMENSIONES</div>
         <div class="fila-inputs">
             <div class="grupo-input">
                 <label for="piezaAncho">Ancho (X)</label>
@@ -192,13 +206,14 @@
             </div>
             <div class="grupo-input">
                 <label for="piezaProf">Fondo (Z)</label>
-                <input type="number" id="piezaProf" value="35" min="5">
+                <input type="number" id="piezaProf" value="30" min="5">
             </div>
         </div>
 
+        <!-- En modo UNIDAD vale 1 y queda desactivado -->
         <div class="grupo-input">
-            <label for="cantidadPiezas">Número de piezas a introducir:</label>
-            <input type="number" id="cantidadPiezas" value="12" min="1" max="500">
+            <label for="cantidadPiezas">Número de piezas:</label>
+            <input type="number" id="cantidadPiezas" value="1" min="1" max="500">
         </div>
 
         <div class="barra-herramientas">
@@ -206,6 +221,7 @@
             <button id="btnCamara" class="secundario">Centrar Cámara 3D</button>
         </div>
 
+        <!-- SECCIÓN 3: CÁLCULOS Y VALIDACIONES -->
         <div class="seccion-titulo">3. Cálculos de Volumen</div>
         <div class="panel-resultados" id="panelResultados">
             Calculando...
@@ -220,14 +236,36 @@
     </main>
 
     <script>
-        // ==========================================
-        // PASO 1: CONFIGURACIÓN DEL ENTORNO 3D (THREE.JS)
-        // ==========================================
+        // =========================================================================
+        // PASO 1: ESTADO CENTRALIZADO DE LA APLICACIÓN (Preparado para crecer)
+        // =========================================================================
+        // Guardamos las dimensiones de cada nivel para validar que UNIDAD <= CAJA <= PALET
+        const estadoLogistico = {
+            unidadActual: 'unidad',
+            unidad: { ancho: 35, alto: 30, prof: 30 },
+            caja:   { ancho: 80, alto: 60, prof: 60, piezas: 4 },
+            palet:  { ancho: 120, alto: 140, prof: 100, piezas: 4 }
+        };
+
+        // Referencias a los elementos del formulario HTML
+        const selectUnidad   = document.getElementById('unidadMedida');
+        const inputContAncho = document.getElementById('contAncho');
+        const inputContAlto  = document.getElementById('contAlto');
+        const inputContProf  = document.getElementById('contProf');
+
+        const inputPiezaAncho = document.getElementById('piezaAncho');
+        const inputPiezaAlto  = document.getElementById('piezaAlto');
+        const inputPiezaProf  = document.getElementById('piezaProf');
+        const inputCantidad   = document.getElementById('cantidadPiezas');
+        const panelResultados = document.getElementById('panelResultados');
+
+        // =========================================================================
+        // PASO 2: CONFIGURACIÓN DEL ENTORNO 3D (THREE.JS)
+        // =========================================================================
         const contenedorDOM = document.getElementById('contenedor3D');
         const escena = new THREE.Scene();
-        escena.background = new THREE.Color(0xdfe6e9); // Fondo gris claro técnico
+        escena.background = new THREE.Color(0xdfe6e9);
 
-        // Cámara con perspectiva humana
         const camara = new THREE.PerspectiveCamera(
             45,
             contenedorDOM.clientWidth / contenedorDOM.clientHeight,
@@ -236,49 +274,34 @@
         );
         camara.position.set(220, 180, 260);
 
-        // Renderizador WebGL con antialiasing para líneas vectoriales nítidas
         const renderizador = new THREE.WebGLRenderer({ antialias: true });
         renderizador.setSize(contenedorDOM.clientWidth, contenedorDOM.clientHeight);
         contenedorDOM.appendChild(renderizador.domElement);
 
-        // Control orbital para girar con el ratón en 360 grados
         const controles = new THREE.OrbitControls(camara, renderizador.domElement);
-        controles.enableDamping = true; // Suaviza el movimiento del ratón
+        controles.enableDamping = true;
 
-        // Iluminación del espacio de trabajo
-        const luzAmbiente = new THREE.AmbientLight(0xffffff, 0.7);
-        escena.add(luzAmbiente);
-
+        escena.add(new THREE.AmbientLight(0xffffff, 0.7));
         const luzDireccional = new THREE.DirectionalLight(0xffffff, 0.6);
         luzDireccional.position.set(200, 400, 300);
         escena.add(luzDireccional);
 
-        // Cuadrícula de suelo de referencia
         const cuadricula = new THREE.GridHelper(400, 20, 0x2c3e50, 0xb2bec3);
         escena.add(cuadricula);
 
-        // ==========================================
-        // PASO 2: CREACIÓN DE GRUPOS Y VARIABLES DE ANIMACIÓN
-        // ==========================================
-        // Usamos geometría unitaria (1x1x1) para poder escalarla con animación suave
         const geometriaUnitaria = new THREE.BoxGeometry(1, 1, 1);
         const bordesUnitarios = new THREE.EdgesGeometry(geometriaUnitaria);
 
-        // Grupo para el contenedor o palet
         const grupoContenedor = new THREE.Group();
         escena.add(grupoContenedor);
 
-        // Grupo donde guardaremos todas las piezas pequeñas
         const grupoPiezas = new THREE.Group();
         escena.add(grupoPiezas);
 
-        // Lista de objetos que necesitan animar sus dimensiones en cada fotograma
         let objetosAnimados = [];
 
-        // Función auxiliar para crear un prisma de estilo vectorial (con bordes marcados)
         function crearPrismaVectorial(colorRelleno, opacidad, colorBorde) {
             const grupo = new THREE.Group();
-
             const materialRelleno = new THREE.MeshPhongMaterial({
                 color: colorRelleno,
                 transparent: opacidad < 1,
@@ -286,7 +309,6 @@
                 depthWrite: opacidad === 1
             });
             const malla = new THREE.Mesh(geometriaUnitaria, materialRelleno);
-
             const materialLinea = new THREE.LineBasicMaterial({ color: colorBorde });
             const lineas = new THREE.LineSegments(bordesUnitarios, materialLinea);
 
@@ -295,71 +317,194 @@
             return grupo;
         }
 
-        // Creamos el objeto visual del Contenedor y la base del Palet
         const mallaContenedor = crearPrismaVectorial(0x3498db, 0.18, 0x2980b9);
         const mallaPalet = crearPrismaVectorial(0xd35400, 1.0, 0x5f27cd);
         grupoContenedor.add(mallaContenedor);
         grupoContenedor.add(mallaPalet);
 
-        // ==========================================
-        // PASO 3: LÓGICA MATEMÁTICA DE VOLUMEN Y ENCAJE
-        // ==========================================
+        // =========================================================================
+        // PASO 3: GESTIÓN DE CAMPOS ACTIVOS / DESACTIVADOS SEGÚN UNIDAD DE MEDIDA
+        // =========================================================================
+        function cambiarModoUnidad() {
+            const nuevoModo = selectUnidad.value;
+
+            if (nuevoModo === 'unidad') {
+                // En UNIDAD: desactivamos Sección 1 y fijamos Número de piezas a 1 desactivado
+                inputContAncho.disabled = true;
+                inputContAlto.disabled  = true;
+                inputContProf.disabled  = true;
+
+                inputPiezaAncho.value = estadoLogistico.unidad.ancho;
+                inputPiezaAlto.value  = estadoLogistico.unidad.alto;
+                inputPiezaProf.value  = estadoLogistico.unidad.prof;
+
+                inputCantidad.value    = 1;
+                inputCantidad.disabled = true;
+            } else if (nuevoModo === 'caja') {
+                // En CAJA: activamos Sección 1 (dimensiones de la caja) y Número de piezas
+                inputContAncho.disabled = false;
+                inputContAlto.disabled  = false;
+                inputContProf.disabled  = false;
+
+                inputContAncho.value = estadoLogistico.caja.ancho;
+                inputContAlto.value  = estadoLogistico.caja.alto;
+                inputContProf.value  = estadoLogistico.caja.prof;
+
+                // En Sección 2 cargamos las dimensiones de la UNIDAD que va dentro
+                inputPiezaAncho.value = estadoLogistico.unidad.ancho;
+                inputPiezaAlto.value  = estadoLogistico.unidad.alto;
+                inputPiezaProf.value  = estadoLogistico.unidad.prof;
+
+                inputCantidad.disabled = false;
+                inputCantidad.value    = estadoLogistico.caja.piezas;
+            } else if (nuevoModo === 'palet') {
+                // En PALET: activamos Sección 1 (dimensiones del palet) y Número de piezas
+                inputContAncho.disabled = false;
+                inputContAlto.disabled  = false;
+                inputContProf.disabled  = false;
+
+                inputContAncho.value = estadoLogistico.palet.ancho;
+                inputContAlto.value  = estadoLogistico.palet.alto;
+                inputContProf.value  = estadoLogistico.palet.prof;
+
+                // En Sección 2 proponemos por defecto las dimensiones de la CAJA
+                inputPiezaAncho.value = estadoLogistico.caja.ancho;
+                inputPiezaAlto.value  = estadoLogistico.caja.alto;
+                inputPiezaProf.value  = estadoLogistico.caja.prof;
+
+                inputCantidad.disabled = false;
+                inputCantidad.value    = estadoLogistico.palet.piezas;
+            }
+
+            estadoLogistico.unidadActual = nuevoModo;
+            calcularYActualizarEscena();
+        }
+
+        // =========================================================================
+        // PASO 4: VALIDACIÓN JERÁRQUICA (UNIDAD <= CAJA <= PALET) Y CÁLCULO 3D
+        // =========================================================================
+        function validarJerarquia(dimMenor, dimMayor, nombreMenor, nombreMayor) {
+            if (dimMenor.ancho > dimMayor.ancho || dimMenor.alto > dimMayor.alto || dimMenor.prof > dimMayor.prof) {
+                return `Regla incumplida: Las dimensiones de <b>${nombreMenor}</b> (${dimMenor.ancho}×${dimMenor.alto}×${dimMenor.prof}) no pueden ser mayores que las de <b>${nombreMayor}</b> (${dimMayor.ancho}×${dimMayor.alto}×${dimMayor.prof}).`;
+            }
+            return null;
+        }
+
         function calcularYActualizarEscena() {
-            // 1. Leemos los parámetros del usuario
-            const modo = document.getElementById('tipoEspacio').value;
-            const cAncho = parseFloat(document.getElementById('contAncho').value) || 100;
-            const cAlto  = parseFloat(document.getElementById('contAlto').value) || 100;
-            const cProf  = parseFloat(document.getElementById('contProf').value) || 100;
+            const modo = selectUnidad.value;
 
-            const pAncho = parseFloat(document.getElementById('piezaAncho').value) || 20;
-            const pAlto  = parseFloat(document.getElementById('piezaAlto').value) || 20;
-            const pProf  = parseFloat(document.getElementById('piezaProf').value) || 20;
-            const cantidadSolicitada = parseInt(document.getElementById('cantidadPiezas').value) || 1;
+            // Leemos los campos de la Sección 1 y Sección 2
+            const s1Ancho = parseFloat(inputContAncho.value) || 10;
+            const s1Alto  = parseFloat(inputContAlto.value)  || 10;
+            const s1Prof  = parseFloat(inputContProf.value)  || 10;
 
-            // Reiniciamos la lista de animaciones
+            const s2Ancho = parseFloat(inputPiezaAncho.value) || 5;
+            const s2Alto  = parseFloat(inputPiezaAlto.value)  || 5;
+            const s2Prof  = parseFloat(inputPiezaProf.value)  || 5;
+
+            // Si es UNIDAD forzamos siempre cantidad = 1
+            if (modo === 'unidad') {
+                inputCantidad.value = 1;
+            }
+            const cantidadSolicitada = (modo === 'unidad') ? 1 : (parseInt(inputCantidad.value) || 1);
+
+            // Actualizamos nuestra memoria según el modo actual y validamos reglas
+            let errorValidacion = null;
+
+            if (modo === 'unidad') {
+                estadoLogistico.unidad = { ancho: s2Ancho, alto: s2Alto, prof: s2Prof };
+                // Validamos que la UNIDAD no supere a la CAJA guardada
+                errorValidacion = validarJerarquia(estadoLogistico.unidad, estadoLogistico.caja, 'UNIDAD', 'CAJA');
+            } else if (modo === 'caja') {
+                estadoLogistico.caja   = { ancho: s1Ancho, alto: s1Alto, prof: s1Prof, piezas: cantidadSolicitada };
+                estadoLogistico.unidad = { ancho: s2Ancho, alto: s2Alto, prof: s2Prof };
+
+                // Validamos UNIDAD <= CAJA y también CAJA <= PALET
+                errorValidacion = validarJerarquia(estadoLogistico.unidad, estadoLogistico.caja, 'UNIDAD', 'CAJA')
+                               || validarJerarquia(estadoLogistico.caja, estadoLogistico.palet, 'CAJA', 'PALET');
+            } else if (modo === 'palet') {
+                estadoLogistico.palet = { ancho: s1Ancho, alto: s1Alto, prof: s1Prof, piezas: cantidadSolicitada };
+                const dimElementoPalet = { ancho: s2Ancho, alto: s2Alto, prof: s2Prof };
+
+                // Validamos que las cajas/unidades en Sección 2 no superen al PALET, ni la UNIDAD supere a este elemento
+                errorValidacion = validarJerarquia(dimElementoPalet, estadoLogistico.palet, 'CAJA / CONTENIDO', 'PALET')
+                               || validarJerarquia(estadoLogistico.unidad, dimElementoPalet, 'UNIDAD', 'CAJA / CONTENIDO');
+            }
+
+            // Si se viola la regla UNIDAD <= CAJA <= PALET, mostramos alerta y detenemos el recálculo
+            if (errorValidacion) {
+                panelResultados.innerHTML = `<span class="alerta-error">✖ ${errorValidacion}</span>`;
+                return;
+            }
+
             objetosAnimados = [];
 
-            // 2. Configuramos la animación del Contenedor / Palet
-            // En modo contenedor mostramos la caja transparente; en modo palet mostramos además una tarima en la base
+            // CASO A: MODO UNIDAD (Dimensiones tomadas exclusivamente de la Sección 2)
+            if (modo === 'unidad') {
+                mallaPalet.visible = false;
+                mallaContenedor.visible = false;
+
+                while (grupoPiezas.children.length > 1) {
+                    grupoPiezas.remove(grupoPiezas.children[grupoPiezas.children.length - 1]);
+                }
+                if (grupoPiezas.children.length === 0) {
+                    const nuevaPieza = crearPrismaVectorial(0xf1c40f, 0.92, 0x2c3e50);
+                    nuevaPieza.scale.set(0.1, 0.1, 0.1);
+                    grupoPiezas.add(nuevaPieza);
+                }
+
+                const piezaUnica = grupoPiezas.children[0];
+                objetosAnimados.push({
+                    objeto: piezaUnica,
+                    escalaMeta: new THREE.Vector3(s2Ancho, s2Alto, s2Prof),
+                    posicionMeta: new THREE.Vector3(0, s2Alto / 2, 0)
+                });
+
+                const volumenUnidad = s2Ancho * s2Alto * s2Prof;
+                panelResultados.innerHTML = `
+                    <span class="alerta-exito">✔ Unidad mínima: UNIDAD (1 pieza fija)</span><br><br>
+                    <b>Dimensiones (Sección 2):</b> ${s2Ancho} (X) × ${s2Alto} (Y) × ${s2Prof} (Z)<br>
+                    <b>Volumen de UNIDAD:</b> ${volumenUnidad.toLocaleString()} u³<br>
+                    <b>Regla jerárquica:</b> Cumple UNIDAD ≤ CAJA (${estadoLogistico.caja.ancho}×${estadoLogistico.caja.alto}×${estadoLogistico.caja.prof})
+                `;
+                return;
+            }
+
+            // CASO B: MODO CAJA O PALET
+            mallaContenedor.visible = true;
             const alturaTarima = (modo === 'palet') ? 6 : 0;
             mallaPalet.visible = (modo === 'palet');
 
             if (modo === 'palet') {
-                mallaPalet.scale.set(cAncho, alturaTarima, cProf);
+                mallaPalet.scale.set(s1Ancho, alturaTarima, s1Prof);
                 mallaPalet.position.set(0, alturaTarima / 2, 0);
             }
 
-            // Registramos el contenedor para que anime su cambio de dimensiones suavemente
             objetosAnimados.push({
                 objeto: mallaContenedor,
-                escalaMeta: new THREE.Vector3(cAncho, cAlto, cProf),
-                posicionMeta: new THREE.Vector3(0, (cAlto / 2) + alturaTarima, 0)
+                escalaMeta: new THREE.Vector3(s1Ancho, s1Alto, s1Prof),
+                posicionMeta: new THREE.Vector3(0, (s1Alto / 2) + alturaTarima, 0)
             });
 
-            // 3. Cálculos matemáticos de cuántas piezas caben físicamente por eje
-            const cabenEnX = Math.floor(cAncho / pAncho);
-            const cabenEnY = Math.floor(cAlto / pAlto);
-            const cabenEnZ = Math.floor(cProf / pProf);
+            const cabenEnX = Math.floor(s1Ancho / s2Ancho);
+            const cabenEnY = Math.floor(s1Alto / s2Alto);
+            const cabenEnZ = Math.floor(s1Prof / s2Prof);
             const capacidadMaximaFisica = Math.max(0, cabenEnX * cabenEnY * cabenEnZ);
 
             const piezasAInsertar = Math.min(cantidadSolicitada, capacidadMaximaFisica);
 
-            // 4. Ajustamos el número de cajas 3D en pantalla
             while (grupoPiezas.children.length > piezasAInsertar) {
                 grupoPiezas.remove(grupoPiezas.children[grupoPiezas.children.length - 1]);
             }
             while (grupoPiezas.children.length < piezasAInsertar) {
                 const nuevaPieza = crearPrismaVectorial(0xf1c40f, 0.92, 0x2c3e50);
-                // Empieza pequeña para que al aparecer crezca con animación
                 nuevaPieza.scale.set(0.1, 0.1, 0.1);
                 grupoPiezas.add(nuevaPieza);
             }
 
-            // 5. Posicionamos cada pieza calculando su fila (X), columna (Z) y piso (Y)
-            // Punto de partida: esquina inferior izquierda trasera del contenedor
-            const origenX = -cAncho / 2 + pAncho / 2;
-            const origenY = alturaTarima + pAlto / 2;
-            const origenZ = -cProf / 2 + pProf / 2;
+            const origenX = -s1Ancho / 2 + s2Ancho / 2;
+            const origenY = alturaTarima + s2Alto / 2;
+            const origenZ = -s1Prof / 2 + s2Prof / 2;
 
             let indice = 0;
             for (let y = 0; y < cabenEnY; y++) {
@@ -368,14 +513,13 @@
                         if (indice >= piezasAInsertar) break;
 
                         const pieza = grupoPiezas.children[indice];
-                        const posX = origenX + (x * pAncho);
-                        const posY = origenY + (y * pAlto);
-                        const posZ = origenZ + (z * pProf);
+                        const posX = origenX + (x * s2Ancho);
+                        const posY = origenY + (y * s2Alto);
+                        const posZ = origenZ + (z * s2Prof);
 
-                        // Añadimos una ligera separación (0.4 unidades) para distinguir bien las aristas
                         objetosAnimados.push({
                             objeto: pieza,
-                            escalaMeta: new THREE.Vector3(pAncho - 0.4, pAlto - 0.4, pProf - 0.4),
+                            escalaMeta: new THREE.Vector3(s2Ancho - 0.4, s2Alto - 0.4, s2Prof - 0.4),
                             posicionMeta: new THREE.Vector3(posX, posY, posZ)
                         });
                         indice++;
@@ -383,39 +527,38 @@
                 }
             }
 
-            // 6. Cálculos de Volumen para mostrar en el panel
-            const volumenContenedor = cAncho * cAlto * cProf;
-            const volumenUnitarioPieza = pAncho * pAlto * pProf;
+            const nombreUnidad = modo.toUpperCase();
+            const volumenContenedor = s1Ancho * s1Alto * s1Prof;
+            const volumenUnitarioPieza = s2Ancho * s2Alto * s2Prof;
             const volumenTotalSolicitado = volumenUnitarioPieza * cantidadSolicitada;
             const volumenEncajado = volumenUnitarioPieza * piezasAInsertar;
             const porcentajeOcupado = ((volumenEncajado / volumenContenedor) * 100).toFixed(1);
 
             let mensajeEstado = '';
             if (cantidadSolicitada <= capacidadMaximaFisica) {
-                mensajeEstado = `<span class="alerta-exito">✔ ¡Todas las piezas encajan! (${piezasAInsertar}/${cantidadSolicitada})</span>`;
+                mensajeEstado = `<span class="alerta-exito">✔ ¡Encaje válido en ${nombreUnidad}! (${piezasAInsertar}/${cantidadSolicitada})</span>`;
             } else {
                 const sobrantes = cantidadSolicitada - capacidadMaximaFisica;
-                mensajeEstado = `<span class="alerta-error">✖ Espacio insuficiente. Caben ${piezasAInsertar} de ${cantidadSolicitada} (Faltan ${sobrantes} por ubicar).</span>`;
+                mensajeEstado = `<span class="alerta-error">✖ Exceso de piezas en ${nombreUnidad}. Caben ${piezasAInsertar} de ${cantidadSolicitada} (Sobrantes: ${sobrantes}).</span>`;
             }
 
-            document.getElementById('panelResultados').innerHTML = `
+            panelResultados.innerHTML = `
                 ${mensajeEstado}<br><br>
+                <b>Unidad seleccionada:</b> ${nombreUnidad}<br>
                 <b>Capacidad por ejes:</b> ${cabenEnX} (X) × ${cabenEnY} (Y) × ${cabenEnZ} (Z) = ${capacidadMaximaFisica} máx.<br>
-                <b>Volumen Espacio:</b> ${volumenContenedor.toLocaleString()} u³<br>
-                <b>Volumen 1 Pieza:</b> ${volumenUnitarioPieza.toLocaleString()} u³<br>
-                <b>Volumen Solicitado:</b> ${volumenTotalSolicitado.toLocaleString()} u³<br>
-                <b>Aprovechamiento real:</b> ${porcentajeOcupado}% del espacio
+                <b>Volumen ${nombreUnidad}:</b> ${volumenContenedor.toLocaleString()} u³<br>
+                <b>Volumen pieza (Sección 2):</b> ${volumenUnitarioPieza.toLocaleString()} u³<br>
+                <b>Volumen total solicitado:</b> ${volumenTotalSolicitado.toLocaleString()} u³<br>
+                <b>Ocupación de ${nombreUnidad}:</b> ${porcentajeOcupado}%
             `;
         }
 
-        // ==========================================
-        // PASO 4: BUCLE DE ANIMACIÓN FLUIDA Y RENDERIZADO
-        // ==========================================
+        // =========================================================================
+        // PASO 5: BUCLE DE ANIMACIÓN Y EVENTOS DE INTERFAZ
+        // =========================================================================
         function animar() {
             requestAnimationFrame(animar);
 
-            // Interpolación lineal (lerp): acerca suavemente el tamaño y posición actual al objetivo
-            // El valor 0.12 controla la velocidad de la animación de cambio de dimensiones
             objetosAnimados.forEach(item => {
                 item.objeto.scale.lerp(item.escalaMeta, 0.12);
                 item.objeto.position.lerp(item.posicionMeta, 0.12);
@@ -425,9 +568,9 @@
             renderizador.render(escena, camara);
         }
 
-        // Eventos de botones y ajuste de pantalla
+        // Eventos principales
+        selectUnidad.addEventListener('change', cambiarModoUnidad);
         document.getElementById('btnCalcular').addEventListener('click', calcularYActualizarEscena);
-        document.getElementById('tipoEspacio').addEventListener('change', calcularYActualizarEscena);
 
         document.getElementById('btnCamara').addEventListener('click', () => {
             camara.position.set(220, 180, 260);
@@ -440,8 +583,8 @@
             renderizador.setSize(contenedorDOM.clientWidth, contenedorDOM.clientHeight);
         });
 
-        // Iniciamos el primer cálculo y arrancamos el motor 3D
-        calcularYActualizarEscena();
+        // Inicializamos los campos según la opción seleccionada al arrancar y lanzamos el motor 3D
+        cambiarModoUnidad();
         animar();
     </script>
 </body>
