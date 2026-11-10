@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proyecto INVENTORY - Simulador 3D de Volúmenes</title>
+    <style>
+        /* Estilos generales de la ventana */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: #1e272e;
+            overflow: hidden;
+        }
+
+        /* Panel lateral izquierdo para introducir parámetros */
+        .panel-control {
+            width: 340px;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+            box-shadow: 3px 0 15px rgba(0,0,0,0.4);
+            z-index: 10;
+        }
+
+        .panel-control h1 {
+            font-size: 1.3rem;
+            color: #3498db;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 6px;
+        }
+
+        .seccion-titulo {
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #f39c12;
+            margin-top: 6px;
+            text-transform: uppercase;
+        }
+
+        .fila-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        .grupo-input {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .grupo-input label {
+            font-size: 0.8rem;
+            color: #bdc3c7;
+        }
+
+        .grupo-input input, .grupo-input select {
+            padding: 7px;
+            border-radius: 4px;
+            border: 1px solid #485460;
+            background-color: #1e272e;
+            color: #ffffff;
+            font-size: 0.9rem;
+        }
+
+        /* Botones de acción */
+        .barra-herramientas {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #2ecc71;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #27ae60;
+        }
+
+        button.secundario {
+            background-color: #3498db;
+        }
+
+        button.secundario:hover {
+            background-color: #2980b9;
+        }
+
+        /* Tarjeta de resultados matemáticos y volúmenes */
+        .panel-resultados {
+            background-color: #1e272e;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .alerta-error {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        .alerta-exito {
+            color: #1dd1a1;
+            font-weight: bold;
+        }
+
+        /* Contenedor del espacio 3D */
+        .espacio-trabajo {
+            flex: 1;
+            position: relative;
+        }
+
+        .guia-raton {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(30, 39, 46, 0.85);
+            color: #ecf0f1;
+            padding: 8px 14px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            pointer-events: none;
+            border: 1px solid #485460;
+        }
+    </style>
+
+    <!-- Cargamos Three.js y OrbitControls desde CDN para gráficos 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <!-- PANEL DE CONTROL IZQUIERDO -->
+    <aside class="panel-control">
+        <h1>INVENTORY 3D</h1>
+
+        <div class="seccion-titulo">1. Espacio / Contenedor</div>
+        <div class="grupo-input">
+            <label for="tipoEspacio">Modo de estructura:</label>
+            <select id="tipoEspacio">
+                <option value="contenedor">Contenedor Cerrado (Caja Mayor)</option>
+                <option value="palet">Base / Palet (Límite en altura)</option>
+            </select>
+        </div>
+
+        <div class="fila-inputs">
+            <div class="grupo-input">
+                <label for="contAncho">Ancho (X)</label>
+                <input type="number" id="contAncho" value="120" min="10">
+            </div>
+            <div class="grupo-input">
+                <label for="contAlto">Alto (Y)</label>
+                <input type="number" id="contAlto" value="100" min="10">
+            </div>
+            <div class="grupo-input">
+                <label for="contProf">Fondo (Z)</label>
+                <input type="number" id="contProf" value="80" min="10">
+            </div>
+        </div>
+
+        <div class="seccion-titulo">2. Piezas / Cajas a encajar</div>
+        <div class="fila-inputs">
+            <div class="grupo-input">
+                <label for="piezaAncho">Ancho (X)</label>
+                <input type="number" id="piezaAncho" value="35" min="5">
+            </div>
+            <div class="grupo-input">
+                <label for="piezaAlto">Alto (Y)</label>
+                <input type="number" id="piezaAlto" value="30" min="5">
+            </div>
+            <div class="grupo-input">
+                <label for="piezaProf">Fondo (Z)</label>
+                <input type="number" id="piezaProf" value="35" min="5">
+            </div>
+        </div>
+
+        <div class="grupo-input">
+            <label for="cantidadPiezas">Número de piezas a introducir:</label>
+            <input type="number" id="cantidadPiezas" value="12" min="1" max="500">
+        </div>
+
+        <div class="barra-herramientas">
+            <button id="btnCalcular">Calcular y Animar Encaje</button>
+            <button id="btnCamara" class="secundario">Centrar Cámara 3D</button>
+        </div>
+
+        <div class="seccion-titulo">3. Cálculos de Volumen</div>
+        <div class="panel-resultados" id="panelResultados">
+            Calculando...
+        </div>
+    </aside>
+
+    <!-- LIENZO 3D PRINCIPAL -->
+    <main class="espacio-trabajo" id="contenedor3D">
+        <div class="guia-raton">
+            🖱️ <b>Clic Izquierdo + Arrastrar:</b> Orbitar 360° | <b>Rueda:</b> Zoom | <b>Clic Derecho + Arrastrar:</b> Mover plano
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // PASO 1: CONFIGURACIÓN DEL ENTORNO 3D (THREE.JS)
+        // ==========================================
+        const contenedorDOM = document.getElementById('contenedor3D');
+        const escena = new THREE.Scene();
+        escena.background = new THREE.Color(0xdfe6e9); // Fondo gris claro técnico
+
+        // Cámara con perspectiva humana
+        const camara = new THREE.PerspectiveCamera(
+            45,
+            contenedorDOM.clientWidth / contenedorDOM.clientHeight,
+            1,
+            5000
+        );
+        camara.position.set(220, 180, 260);
+
+        // Renderizador WebGL con antialiasing para líneas vectoriales nítidas
+        const renderizador = new THREE.WebGLRenderer({ antialias: true });
+        renderizador.setSize(contenedorDOM.clientWidth, contenedorDOM.clientHeight);
+        contenedorDOM.appendChild(renderizador.domElement);
+
+        // Control orbital para girar con el ratón en 360 grados
+        const controles = new THREE.OrbitControls(camara, renderizador.domElement);
+        controles.enableDamping = true; // Suaviza el movimiento del ratón
+
+        // Iluminación del espacio de trabajo
+        const luzAmbiente = new THREE.AmbientLight(0xffffff, 0.7);
+        escena.add(luzAmbiente);
+
+        const luzDireccional = new THREE.DirectionalLight(0xffffff, 0.6);
+        luzDireccional.position.set(200, 400, 300);
+        escena.add(luzDireccional);
+
+        // Cuadrícula de suelo de referencia
+        const cuadricula = new THREE.GridHelper(400, 20, 0x2c3e50, 0xb2bec3);
+        escena.add(cuadricula);
+
+        // ==========================================
+        // PASO 2: CREACIÓN DE GRUPOS Y VARIABLES DE ANIMACIÓN
+        // ==========================================
+        // Usamos geometría unitaria (1x1x1) para poder escalarla con animación suave
+        const geometriaUnitaria = new THREE.BoxGeometry(1, 1, 1);
+        const bordesUnitarios = new THREE.EdgesGeometry(geometriaUnitaria);
+
+        // Grupo para el contenedor o palet
+        const grupoContenedor = new THREE.Group();
+        escena.add(grupoContenedor);
+
+        // Grupo donde guardaremos todas las piezas pequeñas
+        const grupoPiezas = new THREE.Group();
+        escena.add(grupoPiezas);
+
+        // Lista de objetos que necesitan animar sus dimensiones en cada fotograma
+        let objetosAnimados = [];
+
+        // Función auxiliar para crear un prisma de estilo vectorial (con bordes marcados)
+        function crearPrismaVectorial(colorRelleno, opacidad, colorBorde) {
+            const grupo = new THREE.Group();
+
+            const materialRelleno = new THREE.MeshPhongMaterial({
+                color: colorRelleno,
+                transparent: opacidad < 1,
+                opacity: opacidad,
+                depthWrite: opacidad === 1
+            });
+            const malla = new THREE.Mesh(geometriaUnitaria, materialRelleno);
+
+            const materialLinea = new THREE.LineBasicMaterial({ color: colorBorde });
+            const lineas = new THREE.LineSegments(bordesUnitarios, materialLinea);
+
+            grupo.add(malla);
+            grupo.add(lineas);
+            return grupo;
+        }
+
+        // Creamos el objeto visual del Contenedor y la base del Palet
+        const mallaContenedor = crearPrismaVectorial(0x3498db, 0.18, 0x2980b9);
+        const mallaPalet = crearPrismaVectorial(0xd35400, 1.0, 0x5f27cd);
+        grupoContenedor.add(mallaContenedor);
+        grupoContenedor.add(mallaPalet);
+
+        // ==========================================
+        // PASO 3: LÓGICA MATEMÁTICA DE VOLUMEN Y ENCAJE
+        // ==========================================
+        function calcularYActualizarEscena() {
+            // 1. Leemos los parámetros del usuario
+            const modo = document.getElementById('tipoEspacio').value;
+            const cAncho = parseFloat(document.getElementById('contAncho').value) || 100;
+            const cAlto  = parseFloat(document.getElementById('contAlto').value) || 100;
+            const cProf  = parseFloat(document.getElementById('contProf').value) || 100;
+
+            const pAncho = parseFloat(document.getElementById('piezaAncho').value) || 20;
+            const pAlto  = parseFloat(document.getElementById('piezaAlto').value) || 20;
+            const pProf  = parseFloat(document.getElementById('piezaProf').value) || 20;
+            const cantidadSolicitada = parseInt(document.getElementById('cantidadPiezas').value) || 1;
+
+            // Reiniciamos la lista de animaciones
+            objetosAnimados = [];
+
+            // 2. Configuramos la animación del Contenedor / Palet
+            // En modo contenedor mostramos la caja transparente; en modo palet mostramos además una tarima en la base
+            const alturaTarima = (modo === 'palet') ? 6 : 0;
+            mallaPalet.visible = (modo === 'palet');
+
+            if (modo === 'palet') {
+                mallaPalet.scale.set(cAncho, alturaTarima, cProf);
+                mallaPalet.position.set(0, alturaTarima / 2, 0);
+            }
+
+            // Registramos el contenedor para que anime su cambio de dimensiones suavemente
+            objetosAnimados.push({
+                objeto: mallaContenedor,
+                escalaMeta: new THREE.Vector3(cAncho, cAlto, cProf),
+                posicionMeta: new THREE.Vector3(0, (cAlto / 2) + alturaTarima, 0)
+            });
+
+            // 3. Cálculos matemáticos de cuántas piezas caben físicamente por eje
+            const cabenEnX = Math.floor(cAncho / pAncho);
+            const cabenEnY = Math.floor(cAlto / pAlto);
+            const cabenEnZ = Math.floor(cProf / pProf);
+            const capacidadMaximaFisica = Math.max(0, cabenEnX * cabenEnY * cabenEnZ);
+
+            const piezasAInsertar = Math.min(cantidadSolicitada, capacidadMaximaFisica);
+
+            // 4. Ajustamos el número de cajas 3D en pantalla
+            while (grupoPiezas.children.length > piezasAInsertar) {
+                grupoPiezas.remove(grupoPiezas.children[grupoPiezas.children.length - 1]);
+            }
+            while (grupoPiezas.children.length < piezasAInsertar) {
+                const nuevaPieza = crearPrismaVectorial(0xf1c40f, 0.92, 0x2c3e50);
+                // Empieza pequeña para que al aparecer crezca con animación
+                nuevaPieza.scale.set(0.1, 0.1, 0.1);
+                grupoPiezas.add(nuevaPieza);
+            }
+
+            // 5. Posicionamos cada pieza calculando su fila (X), columna (Z) y piso (Y)
+            // Punto de partida: esquina inferior izquierda trasera del contenedor
+            const origenX = -cAncho / 2 + pAncho / 2;
+            const origenY = alturaTarima + pAlto / 2;
+            const origenZ = -cProf / 2 + pProf / 2;
+
+            let indice = 0;
+            for (let y = 0; y < cabenEnY; y++) {
+                for (let z = 0; z < cabenEnZ; z++) {
+                    for (let x = 0; x < cabenEnX; x++) {
+                        if (indice >= piezasAInsertar) break;
+
+                        const pieza = grupoPiezas.children[indice];
+                        const posX = origenX + (x * pAncho);
+                        const posY = origenY + (y * pAlto);
+                        const posZ = origenZ + (z * pProf);
+
+                        // Añadimos una ligera separación (0.4 unidades) para distinguir bien las aristas
+                        objetosAnimados.push({
+                            objeto: pieza,
+                            escalaMeta: new THREE.Vector3(pAncho - 0.4, pAlto - 0.4, pProf - 0.4),
+                            posicionMeta: new THREE.Vector3(posX, posY, posZ)
+                        });
+                        indice++;
+                    }
+                }
+            }
+
+            // 6. Cálculos de Volumen para mostrar en el panel
+            const volumenContenedor = cAncho * cAlto * cProf;
+            const volumenUnitarioPieza = pAncho * pAlto * pProf;
+            const volumenTotalSolicitado = volumenUnitarioPieza * cantidadSolicitada;
+            const volumenEncajado = volumenUnitarioPieza * piezasAInsertar;
+            const porcentajeOcupado = ((volumenEncajado / volumenContenedor) * 100).toFixed(1);
+
+            let mensajeEstado = '';
+            if (cantidadSolicitada <= capacidadMaximaFisica) {
+                mensajeEstado = `<span class="alerta-exito">✔ ¡Todas las piezas encajan! (${piezasAInsertar}/${cantidadSolicitada})</span>`;
+            } else {
+                const sobrantes = cantidadSolicitada - capacidadMaximaFisica;
+                mensajeEstado = `<span class="alerta-error">✖ Espacio insuficiente. Caben ${piezasAInsertar} de ${cantidadSolicitada} (Faltan ${sobrantes} por ubicar).</span>`;
+            }
+
+            document.getElementById('panelResultados').innerHTML = `
+                ${mensajeEstado}<br><br>
+                <b>Capacidad por ejes:</b> ${cabenEnX} (X) × ${cabenEnY} (Y) × ${cabenEnZ} (Z) = ${capacidadMaximaFisica} máx.<br>
+                <b>Volumen Espacio:</b> ${volumenContenedor.toLocaleString()} u³<br>
+                <b>Volumen 1 Pieza:</b> ${volumenUnitarioPieza.toLocaleString()} u³<br>
+                <b>Volumen Solicitado:</b> ${volumenTotalSolicitado.toLocaleString()} u³<br>
+                <b>Aprovechamiento real:</b> ${porcentajeOcupado}% del espacio
+            `;
+        }
+
+        // ==========================================
+        // PASO 4: BUCLE DE ANIMACIÓN FLUIDA Y RENDERIZADO
+        // ==========================================
+        function animar() {
+            requestAnimationFrame(animar);
+
+            // Interpolación lineal (lerp): acerca suavemente el tamaño y posición actual al objetivo
+            // El valor 0.12 controla la velocidad de la animación de cambio de dimensiones
+            objetosAnimados.forEach(item => {
+                item.objeto.scale.lerp(item.escalaMeta, 0.12);
+                item.objeto.position.lerp(item.posicionMeta, 0.12);
+            });
+
+            controles.update();
+            renderizador.render(escena, camara);
+        }
+
+        // Eventos de botones y ajuste de pantalla
+        document.getElementById('btnCalcular').addEventListener('click', calcularYActualizarEscena);
+        document.getElementById('tipoEspacio').addEventListener('change', calcularYActualizarEscena);
+
+        document.getElementById('btnCamara').addEventListener('click', () => {
+            camara.position.set(220, 180, 260);
+            controles.target.set(0, 40, 0);
+        });
+
+        window.addEventListener('resize', () => {
+            camara.aspect = contenedorDOM.clientWidth / contenedorDOM.clientHeight;
+            camara.updateProjectionMatrix();
+            renderizador.setSize(contenedorDOM.clientWidth, contenedorDOM.clientHeight);
+        });
+
+        // Iniciamos el primer cálculo y arrancamos el motor 3D
+        calcularYActualizarEscena();
+        animar();
+    </script>
+</body>
+</html>
